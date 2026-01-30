@@ -32,7 +32,13 @@ export const initDuckDB = async () => {
     const bundle = await duckdb.selectBundle(BUNDLE_URLS);
 
     // 2. Instantiate the worker
-    const worker = new Worker(bundle.mainWorker!);
+    // ⚠️ Security Note: Browsers block 'new Worker(URL)' for cross-origin URLs (CDNs).
+    // We must use a Blob workaround to load the worker script.
+    const workerUrl = URL.createObjectURL(
+      new Blob([`importScripts('${bundle.mainWorker}');`], { type: 'text/javascript' })
+    );
+
+    const worker = new Worker(workerUrl);
     const logger = new duckdb.ConsoleLogger();
 
     // 3. Initialize the database
