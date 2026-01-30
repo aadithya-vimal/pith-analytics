@@ -71,7 +71,21 @@ export const AVAILABLE_MODELS: AIModel[] = [
 ];
 
 let engine: webllm.MLCEngine | null = null;
-let currentModel: string = AVAILABLE_MODELS[0].id;
+
+// Load last used model from localStorage, fallback to first model
+const getDefaultModel = () => {
+  try {
+    const saved = localStorage.getItem('pith-ai-last-model');
+    if (saved && AVAILABLE_MODELS.find(m => m.id === saved)) {
+      return saved;
+    }
+  } catch (e) {
+    // localStorage might be blocked
+  }
+  return AVAILABLE_MODELS[0].id;
+};
+
+let currentModel: string = getDefaultModel();
 
 export interface AIStatus {
   status: "idle" | "loading" | "ready" | "generating" | "error";
@@ -84,6 +98,11 @@ export interface AIStatus {
  */
 export const setModel = (modelId: string) => {
   currentModel = modelId;
+  try {
+    localStorage.setItem('pith-ai-last-model', modelId);
+  } catch (e) {
+    // localStorage might be blocked
+  }
 };
 
 /**
@@ -144,15 +163,29 @@ export const generateInsight = async (
 
   const systemPrompt = `
 You are Pith AI, an advanced Data Analyst running locally on the user's device.
-You have access to the user's data schema.
-Your goal is to answer questions about the data or write SQL queries (DuckDB dialect).
-If asked to write SQL, output ONLY the SQL code within \`\`\`sql blocks.
-Be concise, smart, and efficient.
+
+Your role is to analyze data and provide conversational, insightful answers - NOT just generate SQL queries.
+
+When the user asks a question:
+1. First, provide a clear, natural language answer or insight
+2. If SQL is needed to answer the question, write the query in a \`\`\`sql code block
+3. After the query executes, interpret the results and explain what they mean in plain English
+
+Guidelines:
+- Be conversational and friendly
+- Explain trends, patterns, and insights you discover
+- Use the schema context to understand the data structure
+- For questions like "which employee has the highest salary", answer: "Based on the data, [Name] has the highest salary at $X. Here's the query I used:" followed by the SQL
+- Always interpret query results - don't just show raw data
+- Use DuckDB SQL dialect
+
+Available Schema:
+${context}
   `;
 
   const messages: webllm.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: `Context (Database Schema):\n${context}\n\nUser Question: ${prompt}` }
+    { role: "user", content: prompt }
   ];
 
   const stream = await engine.chat.completions.create({
@@ -176,14 +209,23 @@ export const purgeModel = async () => {
     await engine.unload();
     engine = null;
   }
+
   const keys = await window.caches.keys();
-  let deletedCount = 0;
+  const deletedModels: string[] = [];
+
   for (const key of keys) {
     if (key.includes("webllm") || key.includes("Llama") || key.includes("Phi") || key.includes("Qwen") || key.includes("gemma") || key.includes("Mistral")) {
       log.debug(`Purging Cache: ${key}`, { component: 'AI', action: 'purge' });
+
+      // Extract model name from cache key
+      const modelMatch = AVAILABLE_MODELS.find(m => key.includes(m.id) || key.includes(m.name.replace(/\s/g, '')));
+      if (modelMatch && !deletedModels.includes(modelMatch.name)) {
+        deletedModels.push(modelMatch.name);
+      }
+
       await window.caches.delete(key);
-      deletedCount++;
     }
   }
-  return deletedCount;
+
+  return { count: deletedModels.length, models: deletedModels };
 };

@@ -30,7 +30,17 @@ export default function AIInsights() {
   const [input, setInput] = useState("");
   const [schemaContext, setSchemaContext] = useState("");
   const [isCached, setIsCached] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<AIModel>(AVAILABLE_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState<AIModel>(() => {
+    // Load last used model from localStorage
+    try {
+      const savedId = localStorage.getItem('pith-ai-last-model');
+      const found = AVAILABLE_MODELS.find(m => m.id === savedId);
+      if (found) return found;
+    } catch (e) {
+      // localStorage blocked
+    }
+    return AVAILABLE_MODELS[0];
+  });
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [purgeState, setPurgeState] = useState<PurgeState>("idle");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,6 +96,15 @@ export default function AIInsights() {
 
   const initializeEngine = async () => {
     setStatus("loading");
+
+    // Add beforeunload warning during download
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     try {
       await initAI((report) => {
         setProgress(report.text);
@@ -97,14 +116,22 @@ export default function AIInsights() {
       log.error("AI initialization failed", err, { component: 'AIInsights' });
       setStatus("error");
       toast.error("Failed to load AI Model", { description: err.message });
+    } finally {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     }
   };
 
   const handlePurge = async () => {
     setPurgeState("purging");
     try {
-      const count = await purgeModel();
-      toast.success(`Purged ${count} cache files.`);
+      const result = await purgeModel();
+      if (result.models.length > 0) {
+        toast.success(`Purged ${result.count} model(s)`, {
+          description: `Deleted: ${result.models.join(', ')}`
+        });
+      } else {
+        toast.info("No cached models found to purge");
+      }
       setStatus("idle");
       setIsCached(false);
       setPurgeState("idle");
@@ -340,6 +367,18 @@ export default function AIInsights() {
 
           {status === "loading" && (
             <div className="space-y-6 animate-in fade-in">
+              {/* Warning Banner */}
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-amber-400 mb-1">Model Download in Progress</h4>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Do not close or refresh this page</strong> while the model is downloading.
+                    You can explore other parts of the app in a new tab if needed.
+                  </p>
+                </div>
+              </div>
+
               <Loader2 className="h-16 w-16 animate-spin text-teal-400 mx-auto" />
               <div className="space-y-2">
                 <h3 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Loading {selectedModel.name}...</h3>
