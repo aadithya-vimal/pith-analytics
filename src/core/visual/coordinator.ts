@@ -14,12 +14,13 @@ BigInt.prototype.toJSON = function () { return Number(this); }
 
 // 2. Monkey-Patch Arrow Table for 'vgplot' compatibility
 // This ensures Heatmaps and Scatter plots can find columns.
+// @ts-ignore
 if (!Table.prototype.toColumns) {
   // @ts-ignore
   Table.prototype.toColumns = function () {
     const columns: Record<string, any[]> = {};
     this.schema.fields.forEach((field: any, i: number) => {
-      columns[field.name] = this.getChildAt(i).toArray();
+      columns[field.name] = this.getChildAt(i)!.toArray();
     });
     return columns;
   };
@@ -108,7 +109,7 @@ let isInitialized = false;
 export const initMosaic = async () => {
   if (isInitialized) return;
   const coordinator = vg.coordinator();
-  coordinator.databaseConnector(new PithConnector());
+  coordinator.databaseConnector(new PithConnector() as any);
   isInitialized = true;
   log.success("🎨 Mosaic Visualization Engine linked to DuckDB", { component: 'Mosaic' });
 };

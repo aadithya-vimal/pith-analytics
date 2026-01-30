@@ -117,7 +117,7 @@ export const initAI = async (
   if (engine) return engine;
 
   try {
-    if (!navigator.gpu) {
+    if (!(navigator as any).gpu) {
       throw new Error("WebGPU is not supported. Please use Chrome/Edge.");
     }
 

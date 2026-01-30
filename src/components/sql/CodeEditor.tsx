@@ -19,7 +19,7 @@ export function CodeEditor({ value, onChange, onRun }: CodeEditorProps) {
       // Define a custom theme if needed, or just use 'vs-dark' / 'light'
       monaco.languages.registerCompletionItemProvider("sql", {
         provideCompletionItems: () => {
-          var suggestions = [
+          var suggestions: any[] = [
             {
               label: "SELECT",
               kind: monaco.languages.CompletionItemKind.Keyword,
