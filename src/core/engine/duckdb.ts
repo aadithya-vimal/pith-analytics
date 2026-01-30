@@ -1,19 +1,19 @@
 // src/core/engine/duckdb.ts
 import * as duckdb from '@duckdb/duckdb-wasm';
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
-import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
-import duckdb_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
-import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 import { log } from '@/utils/logger';
 
-const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
+// CDN URLs for DuckDB WASM 1.29.0
+const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+
+// Override with specific stable version to ensure consistency
+const BUNDLE_URLS: duckdb.DuckDBBundles = {
   mvp: {
-    mainModule: duckdb_wasm,
-    mainWorker: mvp_worker,
+    mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/dist/duckdb-mvp.wasm',
+    mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/dist/duckdb-browser-mvp.worker.js',
   },
   eh: {
-    mainModule: duckdb_eh,
-    mainWorker: eh_worker,
+    mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/dist/duckdb-eh.wasm',
+    mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/dist/duckdb-browser-eh.worker.js',
   },
 };
 
@@ -29,7 +29,7 @@ export const initDuckDB = async () => {
 
   try {
     // 1. Select the best bundle for the user's browser
-    const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
+    const bundle = await duckdb.selectBundle(BUNDLE_URLS);
 
     // 2. Instantiate the worker
     const worker = new Worker(bundle.mainWorker!);
